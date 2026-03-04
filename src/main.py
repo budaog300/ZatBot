@@ -205,7 +205,7 @@ async def periodic_messages_sender(bot: Bot):
         except Exception as e:
             logger.error(f'Ошибка в sender: {e}')         
         finally:
-            await asyncio.sleep(5)
+            await asyncio.sleep(1800)
 
 
 async def main():
