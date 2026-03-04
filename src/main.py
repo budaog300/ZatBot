@@ -49,15 +49,6 @@ users_cache = load_users()
 users_cache_len = len(users_cache)
 
 
-def save_user(user_data: dict):
-    users = load_users()
-    user_id = str(user_data["id"]) 
-    if user_id not in users:
-        with open(USERS_FILE, 'w', encoding="utf-8") as f:        
-            users[user_id] = user_data
-            json.dump(users, f, ensure_ascii=False, indent=2)
-
-
 def collect_user(message):
     user = message.from_user
     user_id = str(user.id)
