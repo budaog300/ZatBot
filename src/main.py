@@ -31,8 +31,6 @@ bad_words = ["Никита пидарас @Xonalz", "Антон жидкий @an
 
 dp = Dispatcher()
 active_chats = set()
-users_cache = {}
-users_cache_len = len(users_cache)
 last_save_time = time.time()
 
 
@@ -47,6 +45,10 @@ def load_users() -> dict:
     return {}
 
 
+users_cache = load_users()
+users_cache_len = len(users_cache)
+
+
 def save_user(user_data: dict):
     users = load_users()
     user_id = str(user_data["id"]) 
@@ -56,11 +58,7 @@ def save_user(user_data: dict):
             json.dump(users, f, ensure_ascii=False, indent=2)
 
 
-@dp.message(CommandStart())
-async def command_start_handler(message: Message) -> None:
-    """
-    Command /start
-    """ 
+def collect_user(message):
     user = message.from_user
     user_id = str(user.id)
     if user_id not in users_cache:
@@ -71,12 +69,38 @@ async def command_start_handler(message: Message) -> None:
             'last_name': user.last_name,
             'language': user.language_code,
             'first_seen': str(message.date),
-            'chat_id': message.chat.id
+            'chat_id': message.chat.id,
+            'chats': [message.chat.id]
         }
         users_cache[user_id] = user_data
+    else:
+        if message.chat.id not in users_cache[user_id]['chats']:
+            users_cache[user_id]['chats'].append(message.chat.id)
+
+
+@dp.message(CommandStart())
+async def command_start_handler(message: Message) -> None:
+    """
+    Command /start
+    """ 
+    collect_user(message)
     chat_id = message.chat.id
-    await message.answer(f"Привет, {html.bold(message.from_user.full_name)}! Бот запущен и готов!")    
+    await message.answer(f"Привет, {html.bold(message.from_user.full_name)}! Бот запущен и готов!")   
     active_chats.add(chat_id)
+
+
+@dp.message(Command("stop"))
+async def command_stop_handler(message: Message):
+    """
+    Command /stop
+    """
+    chat_id = message.chat.id
+    if chat_id in active_chats:
+        active_chats.discard(chat_id)
+        await message.answer(f"Бот остановлен! Для возобновления - напишите /start")
+        logger.info(f"Бот остановлен в чате: {chat_id}")
+    else:
+        await message.answer("Бот молчит в этом чате!")   
 
 
 def insult_call(user):
@@ -100,30 +124,24 @@ def insult_call(user):
 async def command_fact_handler(message: Message) -> None:
     """
     Command /call
-    """
-    if not users_cache:
-        await message.answer("Пользователей пока нет")
+    """   
+    current_chat_id = message.chat.id 
+    chat_users = []
+    for user_id, user_data in users_cache.items():
+        if current_chat_id in user_data.get('chats', []):
+            chat_users.append(user_id)
+    
+    if not chat_users:
+        await message.answer("Бот пока не знает о пользователях в этом чате, повзаимодействуйте с ним, пожалуйста!")
         return
-        
-    user_id = random.choice(list(users_cache.keys()))
+       
+    user_id = random.choice(chat_users)
     await message.answer(insult_call(users_cache[user_id]))
 
 
 @dp.message()
 async def collect_user_info(message: Message):
-    user = message.from_user
-    user_id = str(user.id)
-    if user_id not in users_cache:
-        user_data = {
-            'id': user.id,
-            'username': user.username,
-            'first_name': user.first_name,
-            'last_name': user.last_name,
-            'language': user.language_code,
-            'first_seen': str(message.date),
-            'chat_id': message.chat.id
-        }        
-        users_cache[user_id] = user_data 
+    collect_user(message)
 
 
 async def collect_periodic_users():
@@ -131,14 +149,17 @@ async def collect_periodic_users():
     global last_save_time
     while True:
         try:
-            if users_cache and len(users_cache) > users_cache_len and (time.time() - last_save_time) > SAVE_INTERVAL:
+            if users_cache and (time.time() - last_save_time) > SAVE_INTERVAL:
                 with open(USERS_FILE, 'w', encoding='utf-8') as f:                   
                     json.dump(users_cache, f, ensure_ascii=False, indent=2)                    
-                    logger.info(f"✅ Сохранено {len(users_cache)} юзеров")
-                    users_cache_len = len(users_cache)
-                    last_save_time = time.time()
-            else:
-                await asyncio.sleep(5)
+                new_users = len(users_cache) - users_cache_len
+                if new_users > 0:
+                    logger.info(f"✅ +{new_users} новых юзеров")
+                
+                logger.info(f"💾 Всего в базе: {len(users_cache)}")
+                users_cache_len = len(users_cache)
+                last_save_time = time.time()            
+            await asyncio.sleep(5)
         except Exception as e:
             logger.error(f"Ошибка сохранения: {e}")
             await asyncio.sleep(5)
@@ -171,13 +192,20 @@ async def periodic_messages_sender(bot: Bot):
     while True:
         try:
             if active_chats:
-                for chat_id in active_chats:            
-                    await bot.send_message(chat_id, random_words())    
-                    await asyncio.sleep(3)        
+                for chat_id in list(active_chats):
+                    try:
+                        await bot.send_message(chat_id, random_words())    
+                        await asyncio.sleep(3)
+                    except Exception as e:
+                        if "bot was blocked" in str(e).lower():
+                            logger.warning(f"Бот заблокирован в чате {chat_id}, удаляю")
+                            active_chats.discard(chat_id)
+                        else:
+                            logger.error(f'Ошибка отправки в {chat_id}: {e}')       
         except Exception as e:
-            logger.error(f'Ошибка: {e}')            
+            logger.error(f'Ошибка в sender: {e}')         
         finally:
-            await asyncio.sleep(30)
+            await asyncio.sleep(5)
 
 
 async def main():
