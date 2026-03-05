@@ -140,7 +140,7 @@ def collect_user(message: Message):
 def random_answer(message: Message):
     if message.text and not message.text.startswith('/') and not message.from_user.is_bot:        
         if '?' in message.text:
-            if random.random() < 0.3:
+            if random.random() < 0.7:
                 answers = [
                     "А сам как думаешь?",
                     "Хуй его знает",                   
@@ -161,7 +161,7 @@ def random_answer(message: Message):
 def swear_answer(message: Message):
     if message.text and not message.text.startswith("/") and not message.from_user.is_bot:
         if any(swear in message.text for swear in swear_shards):
-            if random.random() < 0.3:
+            if random.random() < 0.5:
                 answers = [
                         "Нахуй ты ругаешься?",
                         "Ты еблан тупой!",                  
