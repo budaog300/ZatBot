@@ -1,0 +1,26 @@
+{
+  "7743054853": {
+    "id": 7743054853,
+    "username": "holly_molly42",
+    "first_name": "Данила",
+    "last_name": "Кириллов",
+    "language": "ru",
+    "first_seen": "2026-03-05 20:09:22+00:00",
+    "chat_id": -4907130369,
+    "chats": [
+      -4907130369
+    ]
+  },
+  "947323598": {
+    "id": 947323598,
+    "username": "Harambeeeeee",
+    "first_name": "Марсель",
+    "last_name": "Зейнетдинов",
+    "language": null,
+    "first_seen": "2026-03-05 20:11:38+00:00",
+    "chat_id": -4907130369,
+    "chats": [
+      -4907130369
+    ]
+  }
+}
